@@ -14,19 +14,34 @@ class GameSelect(discord.ui.View):
         self.user = user
         self.selected_games = []
 
-        # Ensure there is at least one option
+        # Safe fallback if GAMES is empty
         safe_games = GAMES if GAMES else ["No games available"]
 
-        options = [discord.SelectOption(label=game) for game in safe_games]
+        # Ensure options are valid SelectOption objects
+        options = []
+        for game in safe_games:
+            if not game or not isinstance(game, str):
+                game = "Unknown"
+            options.append(discord.SelectOption(label=game))
 
-        # Add the dropdown safely
-        self.add_item(discord.ui.Select(
-            placeholder="Choose your games...",
-            options=options,
-            min_values=1,
-            max_values=len(options),
-            custom_id="game_select"
-        ))
+        # Add dropdown only if we have options
+        if options:
+            self.add_item(discord.ui.Select(
+                placeholder="Choose your games...",
+                options=options,
+                min_values=1,
+                max_values=len(options),
+                custom_id="game_select"
+            ))
+        else:
+            # Very last fallback
+            self.add_item(discord.ui.Select(
+                placeholder="No games available",
+                options=[discord.SelectOption(label="No games available")],
+                min_values=1,
+                max_values=1,
+                custom_id="game_select"
+            ))
 
     @discord.ui.select(custom_id="game_select")
     async def select_callback(self, select, interaction: discord.Interaction):
