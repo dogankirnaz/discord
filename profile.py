@@ -31,12 +31,14 @@ class GameSelect(discord.ui.View):
 class ProfileModal(discord.ui.Modal, title="Save Your Profile"):
     def __init__(self, games):
         super().__init__()
-        # Safe fallback if no games
         self.games = games or ["No games selected"]
-        # Input field for nickname
-        self.add_item(discord.ui.InputText(
+
+        # Correct TextInput for nickname
+        self.add_item(discord.ui.TextInput(
             label="Your Discord Nickname",
-            placeholder="Enter a nickname"
+            placeholder="Enter a nickname",
+            required=True,
+            style=discord.TextStyle.short
         ))
 
     async def on_submit(self, interaction: discord.Interaction):
