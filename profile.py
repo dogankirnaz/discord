@@ -12,7 +12,9 @@ PREFERENCES = [
     "No Microphone", "Ranked Games Only", "Casual Games Only", "Streamer Friendly"
 ]
 
-# ---------- Views & Modals ----------
+MAX_OPTIONS = 25  # Discord select menu max
+
+# ---------- Modals ----------
 class ProfileModal(discord.ui.Modal, title="Save Your Profile"):
     nickname = discord.ui.TextInput(
         label="Your Discord Nickname",
@@ -35,7 +37,7 @@ class ProfileModal(discord.ui.Modal, title="Save Your Profile"):
             ephemeral=True
         )
 
-
+# ---------- Views ----------
 class PreferenceSelect(discord.ui.View):
     def __init__(self, user, games, timezone):
         super().__init__(timeout=60)
@@ -47,14 +49,12 @@ class PreferenceSelect(discord.ui.View):
     @discord.ui.select(
         placeholder="Select your preferences...",
         min_values=0,
-        max_values=len(PREFERENCES),
-        options=[discord.SelectOption(label=pref) for pref in PREFERENCES],
-        custom_id="preference_select"
+        max_values=min(len(PREFERENCES), MAX_OPTIONS),
+        options=[discord.SelectOption(label=pref) for pref in PREFERENCES[:MAX_OPTIONS]]
     )
     async def select_callback(self, interaction: discord.Interaction, select: discord.ui.Select):
         self.selected_preferences = select.values or []
         await interaction.response.send_modal(ProfileModal(self.games, self.timezone, self.selected_preferences))
-
 
 class TimezoneSelect(discord.ui.View):
     def __init__(self, user, games):
@@ -67,8 +67,7 @@ class TimezoneSelect(discord.ui.View):
         placeholder="Select your timezone...",
         min_values=1,
         max_values=1,
-        options=[discord.SelectOption(label=tz) for tz in TIMEZONES],
-        custom_id="timezone_select"
+        options=[discord.SelectOption(label=tz) for tz in TIMEZONES[:MAX_OPTIONS]]
     )
     async def select_callback(self, interaction: discord.Interaction, select: discord.ui.Select):
         self.selected_timezone = select.values[0]
@@ -77,7 +76,6 @@ class TimezoneSelect(discord.ui.View):
             view=PreferenceSelect(self.user, self.games, self.selected_timezone),
             ephemeral=True
         )
-
 
 class GameSelect(discord.ui.View):
     def __init__(self, user):
@@ -88,9 +86,8 @@ class GameSelect(discord.ui.View):
     @discord.ui.select(
         placeholder="Choose your games...",
         min_values=1,
-        max_values=len(GAMES),
-        options=[discord.SelectOption(label=game) for game in GAMES],
-        custom_id="game_select"
+        max_values=min(len(GAMES), MAX_OPTIONS),
+        options=[discord.SelectOption(label=game) for game in GAMES[:MAX_OPTIONS]]
     )
     async def select_callback(self, interaction: discord.Interaction, select: discord.ui.Select):
         self.selected_games = select.values
@@ -99,7 +96,6 @@ class GameSelect(discord.ui.View):
             view=TimezoneSelect(self.user, self.selected_games),
             ephemeral=True
         )
-
 
 # ---------- Command ----------
 async def profile_command(interaction: discord.Interaction):
