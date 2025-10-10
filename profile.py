@@ -14,31 +14,35 @@ class GameSelect(discord.ui.View):
         self.user = user
         self.selected_games = []
 
-        # Add the dropdown
-        options = [discord.SelectOption(label=game) for game in GAMES]
+        # Ensure there is at least one option
+        safe_games = GAMES if GAMES else ["No games available"]
+
+        options = [discord.SelectOption(label=game) for game in safe_games]
+
+        # Add the dropdown safely
         self.add_item(discord.ui.Select(
             placeholder="Choose your games...",
             options=options,
             min_values=1,
-            max_values=len(GAMES),
+            max_values=len(options),
             custom_id="game_select"
         ))
 
     @discord.ui.select(custom_id="game_select")
     async def select_callback(self, select, interaction: discord.Interaction):
-        self.selected_games = select.values
+        self.selected_games = select.values if select.values else ["No games selected"]
         await interaction.response.send_modal(ProfileModal(self.selected_games))
 
 
 class ProfileModal(discord.ui.Modal, title="Save Your Profile"):
     def __init__(self, games):
         super().__init__()
-        self.games = games
+        self.games = games if games else ["No games selected"]
         # Add extra fields here
-        self.add_item(discord.ui.InputText(label="Your Discord Nickname"))
+        self.add_item(discord.ui.InputText(label="Your Discord Nickname", placeholder="Enter a nickname"))
 
     async def on_submit(self, interaction: discord.Interaction):
-        nickname = self.children[0].value
+        nickname = self.children[0].value or "Anonymous"
         # Save to database or memory here
         print(f"{interaction.user} profile saved: {nickname}, Games: {self.games}")
         await interaction.response.send_message(
