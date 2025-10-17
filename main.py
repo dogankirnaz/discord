@@ -19,40 +19,51 @@ async def on_ready():
     except Exception as e:
         print(e)
 
+def get_binance_prices(symbol="CAKEUSDT", limit=90):
+    url = f"https://api.binance.com/api/v3/klines?symbol={symbol.upper()}&interval=1d&limit={limit}"
+    r = requests.get(url)
+    if r.status_code != 200:
+        return None
+    data = r.json()
+    # Convert to (timestamp, close price) format like CoinGecko
+    prices = [[item[0], float(item[4])] for item in data]  # index 4 = close price
+    return prices
+
 @bot.tree.command(name="getcoin", description="Get last 90 days stats and entry/exit info")
 async def getcoin(interaction: discord.Interaction, coin: str):
     await interaction.response.defer(thinking=True)
 
-    url = f"https://api.coingecko.com/api/v3/coins/{coin}/market_chart?vs_currency=usd&days=90"
-    r = requests.get(url)
+    # Handle special case for CAKE
+    if coin.lower() == "cake":
+        symbol = "CAKEUSDT"
+    else:
+        symbol = f"{coin.upper()}USDT"
 
-    if r.status_code != 200:
-        await interaction.followup.send("❌ Error fetching data. Check the coin name.")
+    prices = get_binance_prices(symbol=symbol, limit=90)
+    if not prices:
+        await interaction.followup.send("❌ Error fetching data. Check the coin symbol.")
         return
 
-    data = r.json()
-    prices = data["prices"]
-
-    # Extract price values only
+    # Extract close prices only
     values = [p[1] for p in prices]
 
     # Find lowest and highest prices
     lowest = min(values)
     highest = max(values)
 
-    # Average lowest and highest
-    avg_low = sum(sorted(values)[:int(len(values)*0.1)]) / (len(values)*0.1)
-    avg_high = sum(sorted(values)[-int(len(values)*0.1):]) / (len(values)*0.1)
+    # Average lowest and highest (bottom/top 10%)
+    avg_low = sum(sorted(values)[:int(len(values)*0.1)]) / max(1,int(len(values)*0.1))
+    avg_high = sum(sorted(values)[-int(len(values)*0.1):]) / max(1,int(len(values)*0.1))
 
     # Entry and Exit prices (20% range logic)
-    entry_price = lowest * 1.2  # 20% higher than lowest
-    exit_price = highest * 0.8  # 20% lower than highest
-    stop_loss = lowest * 0.95   # 5% below lowest (optional safe point)
+    entry_price = lowest * 1.2
+    exit_price = highest * 0.8
+    stop_loss = lowest * 0.95
 
     # Find timestamps near entry and exit prices
     def find_time(target):
         closest = min(prices, key=lambda x: abs(x[1] - target))
-        ts = datetime.utcfromtimestamp(closest[0] / 1000).strftime("%Y-%m-%d")
+        ts = datetime.utcfromtimestamp(closest[0]/1000).strftime("%Y-%m-%d")
         return ts
 
     entry_time = find_time(entry_price)
@@ -60,7 +71,7 @@ async def getcoin(interaction: discord.Interaction, coin: str):
 
     # Build embed message
     embed = discord.Embed(
-        title=f"{coin.capitalize()} - 90 Day Summary",
+        title=f"{coin.upper()} - 90 Day Summary",
         color=discord.Color.blue(),
     )
     embed.add_field(name="📉 Lowest", value=f"${lowest:.2f}", inline=True)
@@ -70,7 +81,7 @@ async def getcoin(interaction: discord.Interaction, coin: str):
     embed.add_field(name="🟢 Entry Point", value=f"${entry_price:.2f}\n({entry_time})", inline=False)
     embed.add_field(name="🔴 Exit Point", value=f"${exit_price:.2f}\n({exit_time})", inline=False)
     embed.add_field(name="⚠️ Stop Loss", value=f"${stop_loss:.2f}", inline=False)
-    embed.set_footer(text="Data from CoinGecko • Last 90 days")
+    embed.set_footer(text="Data from Binance • Last 90 days")
 
     await interaction.followup.send(embed=embed)
 
