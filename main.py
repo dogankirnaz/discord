@@ -19,14 +19,13 @@ async def on_ready():
         print(e)
 
 def get_binance_prices(coin, limit=90):
-    symbol = f"{coin.upper()}USDT"  # automatically add USDT
+    symbol = f"{coin.upper()}USDT"
     url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=1d&limit={limit}"
     r = requests.get(url)
     if r.status_code != 200:
         return None
     data = r.json()
-    # Return list of close prices
-    prices = [float(item[4]) for item in data]  # index 4 = close price
+    prices = [float(item[4]) for item in data]  # close prices
     return prices
 
 @bot.tree.command(name="getcoin", description="Get last 90 days stats and entry/exit info")
@@ -38,16 +37,24 @@ async def getcoin(interaction: discord.Interaction, coin: str):
         await interaction.followup.send("❌ Error fetching data. Make sure the coin exists on Binance.")
         return
 
+    # Overall average
+    overall_avg = sum(values) / len(values)
+
+    # Split into above/below average
+    high_values = [v for v in values if v > overall_avg]
+    low_values = [v for v in values if v < overall_avg]
+
+    avg_high = sum(high_values)/len(high_values) if high_values else overall_avg
+    avg_low = sum(low_values)/len(low_values) if low_values else overall_avg
+
     lowest = min(values)
     highest = max(values)
-    avg_low = sum(sorted(values)[:max(1,int(len(values)*0.1))]) / max(1,int(len(values)*0.1))
-    avg_high = sum(sorted(values)[-max(1,int(len(values)*0.1)):]) / max(1,int(len(values)*0.1))
 
-    # Entry, Exit, Stop-loss
-    buy_price = lowest * 1.2       # suggested buy zone
-    sell_price = highest * 0.8     # suggested sell zone
-    stop_loss = lowest              # suggested stop-loss
-    feed_price = (buy_price + stop_loss) / 2  # average point between buy and stop
+    # Entry, Exit, Stop-loss, Feed
+    buy_price = lowest * 1.2
+    sell_price = highest * 0.8
+    stop_loss = lowest
+    feed_price = (buy_price + stop_loss)/2
 
     # Build compact embed
     embed = discord.Embed(
@@ -56,7 +63,7 @@ async def getcoin(interaction: discord.Interaction, coin: str):
     )
     embed.add_field(
         name="📊 Prices",
-        value=f"Lowest: ${lowest:.2f} | Average: ${avg_low:.2f} | Highest: ${highest:.2f}",
+        value=f"Lowest: ${avg_low:.2f} | Average: ${overall_avg:.2f} | Highest: ${avg_high:.2f}",
         inline=False
     )
     embed.add_field(
