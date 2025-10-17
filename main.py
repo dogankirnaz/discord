@@ -41,15 +41,12 @@ def calculate_stats(prices):
     stop_loss = lowest
     feed_price = (buy_price + stop_loss)/2
     return {
-        "avg_low": avg_low,
-        "overall_avg": overall_avg,
-        "avg_high": avg_high,
-        "lowest": lowest,
-        "highest": highest,
         "buy": buy_price,
         "sell": sell_price,
         "stop": stop_loss,
-        "feed": feed_price
+        "feed": feed_price,
+        "lowest": lowest,
+        "highest": highest
     }
 
 @bot.tree.command(name="getcoin", description="Get 60 days stats and buy/sell info")
@@ -68,24 +65,22 @@ async def getcoin(interaction: discord.Interaction, coin: str):
     stats_first = calculate_stats(first_30)
     stats_last = calculate_stats(last_30)
 
-    # Average of both periods
-    combined = {k: (stats_first[k] + stats_last[k])/2 for k in stats_first}
-
+    # Build compact embed with ranges
     embed = discord.Embed(
-        title=f"{coin.upper()} - 60 Day Combined Summary",
+        title=f"{coin.upper()} - 60 Day Summary (30/60 Days Range)",
         color=discord.Color.green()
     )
     embed.add_field(
-        name="📊 Prices",
-        value=f"Lowest: ${combined['avg_low']:.2f} | Average: ${combined['overall_avg']:.2f} | Highest: ${combined['avg_high']:.2f}",
+        name=" Signals",
+        value=(
+            f"Buy: ${stats_first['buy']:.2f} - ${stats_last['buy']:.2f} | "
+            f"Sell: ${stats_first['sell']:.2f} - ${stats_last['sell']:.2f} | "
+            f"Stop: ${stats_first['stop']:.2f} - ${stats_last['stop']:.2f} | "
+            f"Feed: ${stats_first['feed']:.2f} - ${stats_last['feed']:.2f}"
+        ),
         inline=False
     )
-    embed.add_field(
-        name="💰 Signals",
-        value=f"Buy: ${combined['buy']:.2f} | Sell: ${combined['sell']:.2f} | Stop: ${combined['stop']:.2f} | Feed: ${combined['feed']:.2f}",
-        inline=False
-    )
-    embed.set_footer(text="Data from Binance - combined first & last 30 days of 60")
+    embed.set_footer(text="Data from Binance - first 30 vs last 30 days")
 
     await interaction.followup.send(embed=embed)
 
