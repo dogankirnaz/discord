@@ -41,12 +41,15 @@ def calculate_stats(prices):
     stop_loss = lowest
     feed_price = (buy_price + stop_loss)/2
     return {
+        "avg_low": avg_low,
+        "overall_avg": overall_avg,
+        "avg_high": avg_high,
+        "lowest": lowest,
+        "highest": highest,
         "buy": buy_price,
         "sell": sell_price,
         "stop": stop_loss,
-        "feed": feed_price,
-        "lowest": lowest,
-        "highest": highest
+        "feed": feed_price
     }
 
 @bot.tree.command(name="getcoin", description="Get 60 days stats and buy/sell info")
@@ -70,6 +73,17 @@ async def getcoin(interaction: discord.Interaction, coin: str):
         title=f"{coin.upper()} - 60 Day Summary (30/60 Days Range)",
         color=discord.Color.green()
     )
+    # Prices ranges
+    embed.add_field(
+        name=" Prices",
+        value=(
+            f"Lowest: ${stats_first['lowest']:.2f} - ${stats_last['lowest']:.2f} | "
+            f"Average: ${stats_first['overall_avg']:.2f} - ${stats_last['overall_avg']:.2f} | "
+            f"Highest: ${stats_first['highest']:.2f} - ${stats_last['highest']:.2f}"
+        ),
+        inline=False
+    )
+    # Signals ranges
     embed.add_field(
         name=" Signals",
         value=(
