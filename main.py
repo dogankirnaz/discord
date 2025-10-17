@@ -3,7 +3,6 @@ from discord import app_commands
 from discord.ext import commands
 import requests
 import os
-from datetime import datetime
 
 TOKEN = os.getenv("DISCORD_TOKEN")  # set this on Railway
 
@@ -26,47 +25,46 @@ def get_binance_prices(coin, limit=90):
     if r.status_code != 200:
         return None
     data = r.json()
-    # Return list of [timestamp, close price]
-    prices = [[item[0], float(item[4])] for item in data]
+    # Return list of close prices
+    prices = [float(item[4]) for item in data]  # index 4 = close price
     return prices
 
 @bot.tree.command(name="getcoin", description="Get last 90 days stats and entry/exit info")
 async def getcoin(interaction: discord.Interaction, coin: str):
     await interaction.response.defer(thinking=True)
 
-    prices = get_binance_prices(coin)
-    if not prices:
+    values = get_binance_prices(coin)
+    if not values:
         await interaction.followup.send("❌ Error fetching data. Make sure the coin exists on Binance.")
         return
 
-    values = [p[1] for p in prices]
     lowest = min(values)
     highest = max(values)
     avg_low = sum(sorted(values)[:max(1,int(len(values)*0.1))]) / max(1,int(len(values)*0.1))
     avg_high = sum(sorted(values)[-max(1,int(len(values)*0.1)):]) / max(1,int(len(values)*0.1))
-    entry_price = lowest * 1.2
-    exit_price = highest * 0.8
-    stop_loss = lowest * 0.95
 
-    def find_time(target):
-        closest = min(prices, key=lambda x: abs(x[1] - target))
-        return datetime.utcfromtimestamp(closest[0]/1000).strftime("%Y-%m-%d")
+    # Entry, Exit, Stop-loss
+    buy_price = lowest * 1.2       # suggested buy zone
+    sell_price = highest * 0.8     # suggested sell zone
+    stop_loss = lowest              # suggested stop-loss
+    feed_price = (buy_price + stop_loss) / 2  # average point between buy and stop
 
-    entry_time = find_time(entry_price)
-    exit_time = find_time(exit_price)
-
+    # Build compact embed
     embed = discord.Embed(
         title=f"{coin.upper()} - 90 Day Summary",
-        color=discord.Color.blue()
+        color=discord.Color.green()
     )
-    embed.add_field(name="📉 Lowest", value=f"${lowest:.2f}", inline=True)
-    embed.add_field(name="📈 Highest", value=f"${highest:.2f}", inline=True)
-    embed.add_field(name="📊 Avg Low", value=f"${avg_low:.2f}", inline=True)
-    embed.add_field(name="📊 Avg High", value=f"${avg_high:.2f}", inline=True)
-    embed.add_field(name="🟢 Entry Point", value=f"${entry_price:.2f}\n({entry_time})", inline=False)
-    embed.add_field(name="🔴 Exit Point", value=f"${exit_price:.2f}\n({exit_time})", inline=False)
-    embed.add_field(name="⚠️ Stop Loss", value=f"${stop_loss:.2f}", inline=False)
-    embed.set_footer(text="Data from Binance • Last 90 days")
+    embed.add_field(
+        name="📊 Prices",
+        value=f"Lowest: ${lowest:.2f} | Average: ${avg_low:.2f} | Highest: ${highest:.2f}",
+        inline=False
+    )
+    embed.add_field(
+        name="💰 Signals",
+        value=f"Buy: ${buy_price:.2f} | Sell: ${sell_price:.2f} | Stop: ${stop_loss:.2f} | Feed: ${feed_price:.2f}",
+        inline=False
+    )
+    embed.set_footer(text="Last 90 days data from Binance")
 
     await interaction.followup.send(embed=embed)
 
