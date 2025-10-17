@@ -18,7 +18,7 @@ async def on_ready():
     except Exception as e:
         print(e)
 
-def get_binance_prices(coin, limit=60):
+def get_binance_prices(coin, limit=30):
     symbol = f"{coin.upper()}USDT"
     url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=1d&limit={limit}"
     r = requests.get(url)
