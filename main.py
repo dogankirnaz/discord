@@ -50,11 +50,11 @@ async def getcoin(interaction: discord.Interaction, coin: str):
     lowest = min(values)
     highest = max(values)
 
-    # Entry, Exit, Stop-loss, Feed
-    buy_price = lowest * 1.2
-    sell_price = highest * 0.8
-    stop_loss = lowest
-    feed_price = (buy_price + stop_loss)/2
+    # Smarter Buy/Sell calculation based on avg_low/avg_high
+    buy_price = avg_low * 1.05        # slightly above avg_low
+    sell_price = avg_high * 0.95      # slightly below avg_high
+    stop_loss = lowest                 # lowest value
+    feed_price = (buy_price + stop_loss)/2  # midpoint between buy and stop-loss
 
     # Build compact embed
     embed = discord.Embed(
