@@ -18,7 +18,7 @@ async def on_ready():
     except Exception as e:
         print(e)
 
-def get_binance_prices(coin, limit=30):
+def get_binance_prices(coin, limit=60):
     symbol = f"{coin.upper()}USDT"
     url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=1d&limit={limit}"
     r = requests.get(url)
@@ -28,50 +28,64 @@ def get_binance_prices(coin, limit=30):
     prices = [float(item[4]) for item in data]  # close prices
     return prices
 
-@bot.tree.command(name="getcoin", description="Get last 90 days stats and entry/exit info")
+def calculate_stats(prices):
+    overall_avg = sum(prices)/len(prices)
+    high_values = [v for v in prices if v > overall_avg]
+    low_values = [v for v in prices if v < overall_avg]
+    avg_high = sum(high_values)/len(high_values) if high_values else overall_avg
+    avg_low = sum(low_values)/len(low_values) if low_values else overall_avg
+    lowest = min(prices)
+    highest = max(prices)
+    buy_price = avg_low * 1.05
+    sell_price = avg_high * 0.95
+    stop_loss = lowest
+    feed_price = (buy_price + stop_loss)/2
+    return {
+        "avg_low": avg_low,
+        "overall_avg": overall_avg,
+        "avg_high": avg_high,
+        "lowest": lowest,
+        "highest": highest,
+        "buy": buy_price,
+        "sell": sell_price,
+        "stop": stop_loss,
+        "feed": feed_price
+    }
+
+@bot.tree.command(name="getcoin", description="Get 60 days stats and buy/sell info")
 async def getcoin(interaction: discord.Interaction, coin: str):
     await interaction.response.defer(thinking=True)
 
     values = get_binance_prices(coin)
-    if not values:
-        await interaction.followup.send("❌ Error fetching data. Make sure the coin exists on Binance.")
+    if not values or len(values) < 60:
+        await interaction.followup.send("❌ Error fetching data. Make sure the coin exists on Binance and has enough historical data.")
         return
 
-    # Overall average
-    overall_avg = sum(values) / len(values)
+    # Split first 30 and last 30 days
+    first_30 = values[:30]
+    last_30 = values[30:]
 
-    # Split into above/below average
-    high_values = [v for v in values if v > overall_avg]
-    low_values = [v for v in values if v < overall_avg]
+    stats_first = calculate_stats(first_30)
+    stats_last = calculate_stats(last_30)
 
-    avg_high = sum(high_values)/len(high_values) if high_values else overall_avg
-    avg_low = sum(low_values)/len(low_values) if low_values else overall_avg
+    # Average of both periods
+    combined = {k: (stats_first[k] + stats_last[k])/2 for k in stats_first}
 
-    lowest = min(values)
-    highest = max(values)
-
-    # Smarter Buy/Sell calculation based on avg_low/avg_high
-    buy_price = avg_low * 1.05        # slightly above avg_low
-    sell_price = avg_high * 0.95      # slightly below avg_high
-    stop_loss = lowest                 # lowest value
-    feed_price = (buy_price + stop_loss)/2  # midpoint between buy and stop-loss
-
-    # Build compact embed
     embed = discord.Embed(
-        title=f"{coin.upper()} - 90 Day Summary",
+        title=f"{coin.upper()} - 60 Day Combined Summary",
         color=discord.Color.green()
     )
     embed.add_field(
         name="📊 Prices",
-        value=f"Lowest: ${avg_low:.2f} | Average: ${overall_avg:.2f} | Highest: ${avg_high:.2f}",
+        value=f"Lowest: ${combined['avg_low']:.2f} | Average: ${combined['overall_avg']:.2f} | Highest: ${combined['avg_high']:.2f}",
         inline=False
     )
     embed.add_field(
         name="💰 Signals",
-        value=f"Buy: ${buy_price:.2f} | Sell: ${sell_price:.2f} | Stop: ${stop_loss:.2f} | Feed: ${feed_price:.2f}",
+        value=f"Buy: ${combined['buy']:.2f} | Sell: ${combined['sell']:.2f} | Stop: ${combined['stop']:.2f} | Feed: ${combined['feed']:.2f}",
         inline=False
     )
-    embed.set_footer(text="Last 90 days data from Binance")
+    embed.set_footer(text="Data from Binance - combined first & last 30 days of 60")
 
     await interaction.followup.send(embed=embed)
 
