@@ -41,15 +41,21 @@ def get_latest_price(coin):
 def weighted_stats(last30, last60, last90):
     w30, w60, w90 = 0.55, 0.30, 0.15
 
-    # Helper to calculate average of a list
-    def avg(lst):
-        return sum(lst) / len(lst)
+    # Flatten lists for each weighted period
+    all_values = last30 + last60 + last90
 
-    # Calculate average lowest, average highest, and overall average
-    lowest = w30 * avg(last30) + w60 * avg(last60) + w90 * avg(last90)
-    highest = w30 * avg(last30) + w60 * avg(last60) + w90 * avg(last90)  # same here
-    average = (avg(last30) + avg(last60) + avg(last90)) / 3
+    # Weighted average of all values
+    average = (sum(last30)*w30 + sum(last60)*w60 + sum(last90)*w90) / (len(last30)*w30 + len(last60)*w60 + len(last90)*w90)
 
+    # Collect values lower and higher than average
+    lows = [v for v in all_values if v < average]
+    highs = [v for v in all_values if v > average]
+
+    # Midpoint (average) of lows and highs
+    lowest = sum(lows)/len(lows) if lows else average
+    highest = sum(highs)/len(highs) if highs else average
+
+    # Calculate buy/sell/stop
     buy = lowest * 1.05
     sell = highest * 0.95
     stop = lowest * 0.95
@@ -68,7 +74,7 @@ def usd(value):
     return f"${value:,.2f}"
 
 # Simplified signal range ±0.1
-def make_signal_range(value, delta=0.1):
+def make_signal_range(value, delta=0.05):
     low = value - delta
     high = value + delta
     return f"{usd(low)} - {usd(high)}"
