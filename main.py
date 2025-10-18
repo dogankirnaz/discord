@@ -67,7 +67,7 @@ def weighted_stats(last30, last60, last90):
 def usd(value):
     return f"${value:,.2f}"
 
-def make_range(value, percent=0.02):  # dynamic 2% of value
+def make_range(value, percent=0.02):  # dynamic ±2%
     delta = value * percent
     return f"{usd(value - delta)} - {usd(value + delta)}"
 
@@ -108,6 +108,8 @@ async def run_coin_command(interaction=None, message=None, coin=None, ephemeral=
             await interaction.response.send_message(msg, ephemeral=ephemeral)
         elif message:
             await message.reply(msg, mention_author=True)
+            try: await message.delete()
+            except: pass
         return
 
     last30, last60, last90 = values[-30:], values[-60:], values[-90:]
@@ -146,6 +148,10 @@ async def run_coin_command(interaction=None, message=None, coin=None, ephemeral=
         await interaction.response.send_message(embed=embed, ephemeral=ephemeral)
     elif message:
         await message.reply(embed=embed, mention_author=True)
+        try:
+            await message.delete()  # Delete user command after responding
+        except:
+            pass
 
 # --- Message command listener ---
 @bot.event
@@ -155,11 +161,6 @@ async def on_message(message):
     match = re.match(r"!coin\s+(\S+)", message.content)
     if match:
         coin_name = match.group(1)
-        # Delete the user's command message for cleanliness
-        try:
-            await message.delete()
-        except:
-            pass
         await run_coin_command(message=message, coin=coin_name)
 
 bot.run(TOKEN)
