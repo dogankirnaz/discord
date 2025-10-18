@@ -44,23 +44,19 @@ def weighted_stats(last30, last60, last90):
 
     lowest = weighted_avg(min)
     highest = weighted_avg(max)
-    avg_low = weighted_avg(lambda p: sum(v for v in p if v < sum(p)/len(p)) / max(1, len([v for v in p if v < sum(p)/len(p)])))
-    avg_high = weighted_avg(lambda p: sum(v for v in p if v > sum(p)/len(p)) / max(1, len([v for v in p if v > sum(p)/len(p)])))
-    overall_avg = weighted_avg(lambda p: sum(p)/len(p))
+    average = weighted_avg(lambda p: sum(p)/len(p))
 
-    buy_price = avg_low * 1.05
-    sell_price = avg_high * 1.05
-    stop_loss = lowest
+    buy = lowest * 1.05
+    sell = highest * 0.95
+    stop = lowest * 0.95
 
     return {
         "lowest": lowest,
-        "avg_low": avg_low,
-        "overall_avg": overall_avg,
-        "avg_high": avg_high,
+        "average": average,
         "highest": highest,
-        "buy": buy_price,
-        "sell": sell_price,
-        "stop": stop_loss
+        "buy": buy,
+        "sell": sell,
+        "stop": stop
     }
 
 # --- Utility functions ---
@@ -102,7 +98,7 @@ async def coin_slash(interaction: discord.Interaction, coin: str):
 # --- Shared logic ---
 async def run_coin_command(interaction=None, message=None, coin=None, ephemeral=False):
     values = get_binance_prices(coin)
-    latest_price = get_latest_price(coin)
+    latest = get_latest_price(coin)
 
     if not values or len(values) < 90 or not latest_price:
         msg = "Error fetching data. Make sure the coin exists on Binance and has enough history."
@@ -121,12 +117,11 @@ async def run_coin_command(interaction=None, message=None, coin=None, ephemeral=
     # Format stats prices
     for k in stats:
         stats[k] = round(stats[k], 2)
-    latest_price_str = usd(latest_price)
 
     # Make signal ranges ±10% clamped to meaningful bounds
-    buy_range = make_signal_range(stats["buy"], stats["buy"], stats["buy"])
-    sell_range = make_signal_range(stats["sell"], stats["sell"], stats["sell"])
-    stop_range = make_signal_range(stats["stop"], stats["lowest"], stats["sell"])
+    buy_range = make_signal_range(stats["buy"], stats["buy"] * 0.95, stats["buy"] *1.05)
+    sell_range = make_signal_range(stats["sell"], stats["sell"] * 0.95, stats["sell"] *1.05)
+    stop_range = make_signal_range(stats["stop"], stats["lowest"] *0.95, stats["lowest"] *1.05)
 
     # Determine signal
     if stats["buy"] * 0.8 <= latest_price <= stats["buy"] * 1.2:
@@ -137,10 +132,10 @@ async def run_coin_command(interaction=None, message=None, coin=None, ephemeral=
         signal, color = "HOLD", discord.Color.greyple()
 
     # Build embed
-    embed = discord.Embed(title=f"{coin.upper()} — {signal} ({latest_price_str})", color=color)
+    embed = discord.Embed(title=f"{coin.upper()} — {signal} ({usd(latest)})", color=color)
     embed.add_field(
         name="Prices",
-        value=f"Lowest: **{usd(stats['avg_low'])}** • Average: **{usd(stats['overall_avg'])}** • Highest: **{usd(stats['avg_high'])}**",
+        value=f"Lowest: **{usd(stats['lowest'])}** • Average: **{usd(stats['average'])}** • Highest: **{usd(stats['highest'])}**",
         inline=False
     )
     embed.add_field(
