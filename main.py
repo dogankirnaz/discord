@@ -4,6 +4,7 @@ from discord.ext import commands
 import requests
 import os
 import re
+import asyncio
 
 TOKEN = os.getenv("DISCORD_TOKEN")
 
@@ -45,7 +46,7 @@ def weighted_stats(last30, last60, last90):
     overall_avg = weighted_avg(lambda p: sum(p) / len(p))
 
     buy_price = avg_low * 1.05
-    sell_price = avg_high * 0.95
+    sell_price = avg_high * 1.05   # adjusted to be slightly above high
     stop_loss = lowest
 
     return {
@@ -58,6 +59,9 @@ def weighted_stats(last30, last60, last90):
         "sell": sell_price,
         "stop": stop_loss
     }
+
+def make_range_fixed(value, delta=0.1):
+    return f"${round(value - delta,1)} - ${round(value + delta,1)}"
 
 @bot.event
 async def on_ready():
@@ -72,8 +76,10 @@ async def on_ready():
         if guild.text_channels:
             first_channel = guild.text_channels[0]
             try:
-                await first_channel.send("Ready!")
-                print(f"✅ Sent ready message to {guild.name} in #{first_channel.name}")
+                msg = await first_channel.send("Ready!")
+                await asyncio.sleep(30)
+                await msg.delete()
+                print(f"✅ Sent and deleted Ready message in {guild.name}")
             except Exception as e:
                 print(f"⚠️ Couldn't send message in {guild.name}: {e}")
 
@@ -88,11 +94,13 @@ async def run_coin_command(interaction=None, message=None, coin=None):
     latest_price = get_latest_price(coin)
 
     if not values or len(values) < 90 or not latest_price:
-        msg = "Error fetching data. Make sure the coin exists on Binance and has enough history."
+        msg_text = "Error fetching data. Make sure the coin exists on Binance and has enough history."
         if interaction:
-            await interaction.response.send_message(msg)
+            await interaction.response.send_message(msg_text, ephemeral=True)
         elif message:
-            await message.reply(msg, mention_author=True)
+            reply_msg = await message.reply(msg_text, mention_author=True)
+            await asyncio.sleep(30)
+            await reply_msg.delete()
         return
 
     last30 = values[-30:]
@@ -104,12 +112,9 @@ async def run_coin_command(interaction=None, message=None, coin=None):
         stats[k] = round(stats[k], 1)
     latest_price = round(latest_price, 1)
 
-    def make_range(value, delta=0.1):
-        return f"${round(value - delta, 1)} - ${round(value + delta, 1)}"
-
-    buy_range = make_range(stats["buy"])
-    sell_range = make_range(stats["sell"])
-    stop_range = make_range(stats["stop"])
+    buy_range = make_range_fixed(stats["buy"])
+    sell_range = make_range_fixed(stats["sell"])
+    stop_range = make_range_fixed(stats["stop"])
 
     if stats["buy"] * 0.8 <= latest_price <= stats["buy"] * 1.2:
         signal = "BUY"
@@ -146,10 +151,14 @@ async def run_coin_command(interaction=None, message=None, coin=None):
         inline=False
     )
 
+    embed.set_footer(text="Data from Binance")
+
     if interaction:
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
     elif message:
-        await message.reply(embed=embed, mention_author=True)
+        reply_msg = await message.reply(embed=embed, mention_author=True)
+        await asyncio.sleep(60)
+        await reply_msg.delete()
 
 @bot.event
 async def on_message(message):
