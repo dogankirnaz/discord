@@ -67,9 +67,10 @@ def weighted_stats(last30, last60, last90):
 def usd(value):
     return f"${value:,.2f}"
 
-def make_range(value, percent=0.02):  # dynamic ±2%
-    delta = value * percent
-    return f"{usd(value - delta)} - {usd(value + delta)}"
+def make_range(value, percent=0.2):  # ±20% of value
+    low = value * (1 - percent)
+    high = value * (1 + percent)
+    return f"{usd(low)} - {usd(high)}"
 
 # --- Bot events ---
 @bot.event
