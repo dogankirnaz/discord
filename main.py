@@ -74,7 +74,7 @@ def usd(value):
     return f"${value:,.2f}"
 
 # Dynamic signal range based on value magnitude
-def make_signal_range(value, percent=0.005):  # 0.5%
+def make_signal_range(value, percent=0.01):  # 0.1%
     delta = value * percent
     low = value - delta
     high = value + delta
