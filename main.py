@@ -3,6 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 import requests
 import os
+import random
 
 TOKEN = os.getenv("DISCORD_TOKEN")  # set this on Railway
 
@@ -18,7 +19,7 @@ async def on_ready():
     except Exception as e:
         print(e)
 
-def get_binance_prices(coin, limit=60):
+def get_binance_prices(coin, limit=90):
     symbol = f"{coin.upper()}USDT"
     url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=1d&limit={limit}"
     r = requests.get(url)
@@ -52,49 +53,55 @@ def calculate_stats(prices):
         "feed": feed_price
     }
 
-@bot.tree.command(name="getcoin", description="Get 60 days stats and buy/sell info")
+@bot.tree.command(name="getcoin", description="Get weighted 90-day stats (55% last 30d, 30% mid, 15% early)")
 async def getcoin(interaction: discord.Interaction, coin: str):
     await interaction.response.defer(thinking=True)
 
     values = get_binance_prices(coin)
-    if not values or len(values) < 60:
+    if not values or len(values) < 90:
         await interaction.followup.send("❌ Error fetching data. Make sure the coin exists on Binance and has enough historical data.")
         return
 
-    # Split first 30 and last 30 days
-    first_30 = values[:30]
-    last_30 = values[30:]
+    # Split the data
+    last_30 = values[-30:]      # most recent month
+    mid_30 = values[-60:-30]    # 31–60 days ago
+    early_30 = values[-90:-60]  # 61–90 days ago
 
-    stats_first = calculate_stats(first_30)
-    stats_last = calculate_stats(last_30)
+    # Apply weighted sampling
+    weighted_data = (
+        random.choices(last_30, k=int(len(values) * 0.55)) +
+        random.choices(mid_30, k=int(len(values) * 0.30)) +
+        random.choices(early_30, k=int(len(values) * 0.15))
+    )
 
-    # Build compact embed with ranges
+    # Calculate stats based on merged weighted data
+    stats = calculate_stats(weighted_data)
+
+    # Build embed
     embed = discord.Embed(
-        title=f"{coin.upper()} - 60 Day Summary (30/60 Days Range)",
-        color=discord.Color.green()
+        title=f"{coin.upper()} - 90 Day Weighted Summary",
+        color=discord.Color.blue()
     )
-    # Prices ranges
     embed.add_field(
-        name=" Prices",
+        name="📊 Prices",
         value=(
-            f"Lowest: ${stats_first['lowest']:.2f} - ${stats_last['lowest']:.2f} | "
-            f"Average: ${stats_first['overall_avg']:.2f} - ${stats_last['overall_avg']:.2f} | "
-            f"Highest: ${stats_first['highest']:.2f} - ${stats_last['highest']:.2f}"
+            f"Lowest: ${stats['avg_low']:.2f} | "
+            f"Average: ${stats['overall_avg']:.2f} | "
+            f"Highest: ${stats['avg_high']:.2f}"
         ),
         inline=False
     )
-    # Signals ranges
     embed.add_field(
-        name=" Signals",
+        name="💰 Signals",
         value=(
-            f"Buy: ${stats_first['buy']:.2f} - ${stats_last['buy']:.2f} | "
-            f"Sell: ${stats_first['sell']:.2f} - ${stats_last['sell']:.2f} | "
-            f"Stop: ${stats_first['stop']:.2f} - ${stats_last['stop']:.2f} | "
-            f"Feed: ${stats_first['feed']:.2f} - ${stats_last['feed']:.2f}"
+            f"Buy: ${stats['buy']:.2f} | "
+            f"Sell: ${stats['sell']:.2f} | "
+            f"Stop: ${stats['stop']:.2f} | "
+            f"Feed: ${stats['feed']:.2f}"
         ),
         inline=False
     )
-    embed.set_footer(text="Data from Binance - first 30 vs last 30 days")
+    embed.set_footer(text="Data from Binance • Weighted (55% recent, 30% mid, 15% early)")
 
     await interaction.followup.send(embed=embed)
 
