@@ -67,10 +67,17 @@ def weighted_stats(last30, last60, last90):
 def usd(value):
     return f"${value:,.2f}"
 
-def make_range(value, percent=0.2):  # ±20% of value
-    low = value * (1 - percent)
-    high = value * (1 + percent)
-    return f"{usd(low)} - {usd(high)}"
+def make_range(value):
+    # Small delta for coins <10, larger for bigger coins
+    if value < 10:
+        delta = 0.1
+    elif value < 100:
+        delta = 1
+    elif value < 1000:
+        delta = 5
+    else:
+        delta = value * 0.01  # 1% for very big prices
+    return f"{usd(value - delta)} - {usd(value + delta)}"
 
 # --- Bot events ---
 @bot.event
