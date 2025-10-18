@@ -150,16 +150,19 @@ async def run_coin_command(interaction=None, message=None, coin=None, ephemeral=
     elif message:
         await message.reply(embed=embed, mention_author=True)
         try:
+            await asyncio.sleep(30)
             await message.delete()  # Delete user command after responding
         except:
             pass
 
-# --- Message command listener ---
+# --- Message command listener for ! commands
 @bot.event
 async def on_message(message):
     if message.author.bot:
         return
-    match = re.match(r"!coin\s+(\S+)", message.content)
+    
+    # Match messages starting with !
+    match = re.match(r"!(\w+)", message.content)
     if match:
         coin_name = match.group(1)
         await run_coin_command(message=message, coin=coin_name)
