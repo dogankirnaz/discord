@@ -124,9 +124,9 @@ async def run_coin_command(interaction=None, message=None, coin=None, ephemeral=
     latest_price_str = usd(latest_price)
 
     # Make signal ranges ±10% clamped to meaningful bounds
-    buy_range = make_signal_range(stats["buy"], stats["lowest"], stats["avg_high"])
-    sell_range = make_signal_range(stats["sell"], stats["avg_low"], stats["highest"])
-    stop_range = make_signal_range(stats["stop"], stats["lowest"], stats["avg_low"])
+    buy_range = make_signal_range(stats["buy"], stats["buy"], stats["buy"])
+    sell_range = make_signal_range(stats["sell"], stats["sell"], stats["sell"])
+    stop_range = make_signal_range(stats["stop"], stats["lowest"], stats["sell"])
 
     # Determine signal
     if stats["buy"] * 0.8 <= latest_price <= stats["buy"] * 1.2:
