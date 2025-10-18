@@ -19,9 +19,16 @@ def get_binance_prices(coin, limit=90):
     prices = [float(item[4]) for item in data]  # close prices
     return prices
 
+def get_latest_price(coin):
+    symbol = f"{coin.upper()}USDT"
+    url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}"
+    r = requests.get(url, timeout=5)
+    if r.status_code != 200:
+        return None
+    return float(r.json()["price"])
+
 def weighted_stats(last30, last60, last90):
     w30, w60, w90 = 0.55, 0.30, 0.15
-    all_prices = last30 + last60 + last90
 
     def weighted_avg(func):
         v30 = func(last30)
@@ -66,8 +73,10 @@ async def getcoin(interaction: discord.Interaction, coin: str):
     await interaction.response.defer(thinking=True)
 
     values = get_binance_prices(coin)
-    if not values or len(values) < 90:
-        await interaction.followup.send("❌ Error fetching data. Need 90 days of data and a valid Binance symbol.")
+    latest_price = get_latest_price(coin)
+
+    if not values or len(values) < 90 or not latest_price:
+        await interaction.followup.send("Error fetching data. Make sure the coin exists on Binance and has enough history.")
         return
 
     last30 = values[-30:]
@@ -76,24 +85,45 @@ async def getcoin(interaction: discord.Interaction, coin: str):
 
     stats = weighted_stats(last30, last60, last90)
 
-    # Round all values to 1 decimal
+    # Round values to one decimal
     for k in stats:
         stats[k] = round(stats[k], 1)
+    latest_price = round(latest_price, 1)
+
+    # Determine signal based on 20% closeness
+    buy_threshold = stats["buy"] * 1.2
+    sell_threshold = stats["sell"] * 0.8
+
+    if latest_price <= buy_threshold:
+        signal = "BUY"
+        color = discord.Color.green()
+    elif latest_price >= sell_threshold:
+        signal = "SELL"
+        color = discord.Color.red()
+    else:
+        signal = "HOLD"
+        color = discord.Color.greyple()
 
     embed = discord.Embed(
-        title=f"{coin.upper()} - Weighted 90d Summary",
-        color=discord.Color.green()
+        title=f"{coin.upper()} - {signal}",
+        color=color
     )
 
     embed.add_field(
-        name="📊 Prices (weighted)",
+        name="Prices (weighted)",
         value=f"Lowest: ${stats['avg_low']} | Average: ${stats['overall_avg']} | Highest: ${stats['avg_high']}",
         inline=False
     )
 
     embed.add_field(
-        name="💰 Signals",
+        name="Signals",
         value=f"Buy: ${stats['buy']} | Sell: ${stats['sell']} | Stop: ${stats['stop']} | Feed: ${stats['feed']}",
+        inline=False
+    )
+
+    embed.add_field(
+        name="Current Price",
+        value=f"${latest_price}",
         inline=False
     )
 
