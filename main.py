@@ -41,22 +41,17 @@ def get_latest_price(coin):
 def weighted_stats(last30, last60, last90):
     w30, w60, w90 = 0.55, 0.30, 0.15
 
-    # Flatten lists for each weighted period
     all_values = last30 + last60 + last90
+    main_average = (sum(last30)*w30 + sum(last60)*w60 + sum(last90)*w90) / \
+                   (len(last30)*w30 + len(last60)*w60 + len(last90)*w90)
 
-    # Weighted average of all values
-    main_average = (sum(last30)*w30 + sum(last60)*w60 + sum(last90)*w90) / (len(last30)*w30 + len(last60)*w60 + len(last90)*w90)
-
-    # Collect values lower and higher than average
     lows = [v for v in all_values if v < main_average]
     highs = [v for v in all_values if v > main_average]
 
-    # Midpoint (average) of lows and highs
     lowest = sum(lows)/len(lows) if lows else main_average
     highest = sum(highs)/len(highs) if highs else main_average
     average = max((lowest + highest) / 2, 0)
     
-    # Calculate buy/sell/stop
     buy = lowest * 1.05
     sell = highest * 0.95
     stop = lowest * 0.95
@@ -140,28 +135,28 @@ async def run_coin_command(interaction=None, message=None, coin=None, ephemeral=
     if latest <= stats["stop"] * 0.9:
         signal, color = "WAIT", discord.Color.orange()
     elif buy_low <= latest <= buy_high or sell_low <= latest <= sell_high:
-    # calculate distances to buy and sell
-    dist_to_buy = abs(latest - stats["buy"])
-    dist_to_sell = abs(latest - stats["sell"])
+        # Calculate distances to buy and sell
+        dist_to_buy = abs(latest - stats["buy"])
+        dist_to_sell = abs(latest - stats["sell"])
 
-    if dist_to_buy < dist_to_sell:
-        signal, color = "BUY", discord.Color.green()
-    elif dist_to_sell < dist_to_buy:
-        signal, color = "SELL", discord.Color.red()
-    else:
-        signal, color = "HOLD", discord.Color.greyple()  # exactly equal distance
+        if dist_to_buy < dist_to_sell:
+            signal, color = "BUY", discord.Color.green()
+        elif dist_to_sell < dist_to_buy:
+            signal, color = "SELL", discord.Color.red()
+        else:
+            signal, color = "HOLD", discord.Color.greyple()  # exactly equal distance
     else:
         signal, color = "HOLD", discord.Color.greyple()
     
     embed = discord.Embed(title=f"{coin.upper()} — {signal} ({usd(latest)})", color=color)
     embed.add_field(
         name="Prices",
-        value=f"Lowest: **{usd(stats['lowest'])}** \nAverage: **{usd(stats['average'])}** \nHighest: **{usd(stats['highest'])}**",
+        value=f"Lowest: **{usd(stats['lowest'])}**\nAverage: **{usd(stats['average'])}**\nHighest: **{usd(stats['highest'])}**",
         inline=False
     )
     embed.add_field(
-    name="Signals",
-        value=f"Buy: **{buy_range}** \nSell: **{sell_range}** \nStop: **{stop_range}**",
+        name="Signals",
+        value=f"Buy: **{buy_range}**\nSell: **{sell_range}**\nStop: **{stop_range}**",
         inline=False
     )
 
