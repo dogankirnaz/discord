@@ -67,9 +67,10 @@ def weighted_stats(last30, last60, last90):
 def usd(value):
     return f"${value:,.2f}"
 
-def make_signal_range(value, min_value, max_value, percent=0.1):
-    low = max(value * (1 - percent), min_value)
-    high = min(value * (1 + percent), max_value)
+# Simplified signal range ±0.1
+def make_signal_range(value, delta=0.1):
+    low = value - delta
+    high = value + delta
     return f"{usd(low)} - {usd(high)}"
 
 # --- Bot events ---
@@ -122,9 +123,9 @@ async def run_coin_command(interaction=None, message=None, coin=None, ephemeral=
     for k in stats:
         stats[k] = round(stats[k], 2)
 
-    buy_range = make_signal_range(stats["buy"], stats["buy"] * 0.95, stats["buy"] * 1.05)
-    sell_range = make_signal_range(stats["sell"], stats["sell"] * 0.95, stats["sell"] * 1.05)
-    stop_range = make_signal_range(stats["stop"], stats["lowest"] * 0.95, stats["lowest"] * 1.05)
+    buy_range = make_signal_range(stats["buy"])
+    sell_range = make_signal_range(stats["sell"])
+    stop_range = make_signal_range(stats["stop"])
 
     if stats["buy"] * 0.8 <= latest <= stats["buy"] * 1.2:
         signal, color = "BUY", discord.Color.green()
