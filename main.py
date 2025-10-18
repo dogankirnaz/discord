@@ -140,13 +140,13 @@ async def run_coin_command(interaction=None, message=None, coin=None, ephemeral=
     
     embed = discord.Embed(title=f"{coin.upper()} — {signal} ({usd(latest)})", color=color)
     embed.add_field(
-        name="Prices",
-        value=f"Lowest: **{usd(stats['lowest'])}**\nAverage: **{usd(stats['average'])}**\nHighest: **{usd(stats['highest'])}**",
+        name="",
+        value=f"## L: **{usd(stats['lowest'])} • **A: **{usd(stats['average'])} • **H: **{usd(stats['highest'])}**",
         inline=False
     )
     embed.add_field(
-        name="Signals",
-        value=f"Buy: **{usd(stats['buy'])}**\nSell: **{usd(stats['sell'])}**\nStop: **{usd(stats['stop'])}**",
+        name="",
+        value=f"## B: **{usd(stats['buy'])} • **S: **{usd(stats['sell'])} • **L: **{usd(stats['stop'])}**",
         inline=False
     )
 
