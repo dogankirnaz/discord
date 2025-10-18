@@ -8,7 +8,7 @@ import re
 TOKEN = os.getenv("DISCORD_TOKEN")
 
 intents = discord.Intents.default()
-intents.message_content = True  # Needed to read messages
+intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 def get_binance_prices(coin, limit=90):
@@ -47,7 +47,6 @@ def weighted_stats(last30, last60, last90):
     buy_price = avg_low * 1.05
     sell_price = avg_high * 0.95
     stop_loss = lowest
-    feed_price = (buy_price + stop_loss) / 2
 
     return {
         "lowest": lowest,
@@ -57,8 +56,7 @@ def weighted_stats(last30, last60, last90):
         "highest": highest,
         "buy": buy_price,
         "sell": sell_price,
-        "stop": stop_loss,
-        "feed": feed_price
+        "stop": stop_loss
     }
 
 @bot.event
@@ -83,8 +81,8 @@ async def on_ready():
 async def coin_slash(interaction: discord.Interaction, coin: str):
     await run_coin_command(interaction=interaction, coin=coin)
 
-async def run_coin_command(interaction=None, ctx=None, coin=None):
-    """Shared logic for slash commands (interaction) and prefix messages (ctx)"""
+async def run_coin_command(interaction=None, message=None, coin=None):
+    """Shared logic for slash commands (interaction) and message replies"""
     # Fetch data
     values = get_binance_prices(coin)
     latest_price = get_latest_price(coin)
@@ -93,8 +91,8 @@ async def run_coin_command(interaction=None, ctx=None, coin=None):
         msg = "Error fetching data. Make sure the coin exists on Binance and has enough history."
         if interaction:
             await interaction.response.send_message(msg)
-        elif ctx:
-            await ctx.send(msg)
+        elif message:
+            await message.reply(msg, mention_author=True)
         return
 
     last30 = values[-30:]
@@ -106,15 +104,14 @@ async def run_coin_command(interaction=None, ctx=None, coin=None):
         stats[k] = round(stats[k], 1)
     latest_price = round(latest_price, 1)
 
-    def make_range(value):
-        low = round(value * 0.8, 1)
-        high = round(value * 1.2, 1)
+    def make_range(value, percent=0.05):
+        low = round(value * (1 - percent), 1)
+        high = round(value * (1 + percent), 1)
         return f"${low} - ${high}"
 
     buy_range = make_range(stats["buy"])
     sell_range = make_range(stats["sell"])
     stop_range = make_range(stats["stop"])
-    feed_range = make_range(stats["feed"])
 
     if stats["buy"] * 0.8 <= latest_price <= stats["buy"] * 1.2:
         signal = "BUY"
@@ -146,18 +143,15 @@ async def run_coin_command(interaction=None, ctx=None, coin=None):
         value=(
             f"Buy: **{buy_range}** • "
             f"Sell: **{sell_range}** • "
-            f"Stop: **{stop_range}** • "
-            f"Feed: **{feed_range}**"
+            f"Stop: **{stop_range}**"
         ),
         inline=False
     )
 
-    embed.set_footer(text="Data from Binance")
-
     if interaction:
         await interaction.response.send_message(embed=embed)
-    elif ctx:
-        await ctx.send(embed=embed)
+    elif message:
+        await message.reply(embed=embed, mention_author=True)
 
 @bot.event
 async def on_message(message):
@@ -167,6 +161,6 @@ async def on_message(message):
     match = re.match(r"!coin\s+(\S+)", message.content)
     if match:
         coin_name = match.group(1)
-        await run_coin_command(ctx=message.channel, coin=coin_name)
+        await run_coin_command(message=message, coin=coin_name)
 
 bot.run(TOKEN)
