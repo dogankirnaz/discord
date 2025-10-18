@@ -3,10 +3,12 @@ from discord import app_commands
 from discord.ext import commands
 import requests
 import os
+import re
 
-TOKEN = os.getenv("DISCORD_TOKEN")  # set this on Railway
+TOKEN = os.getenv("DISCORD_TOKEN")
 
 intents = discord.Intents.default()
+intents.message_content = True  # Needed to read messages
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 def get_binance_prices(coin, limit=90):
@@ -59,43 +61,61 @@ def weighted_stats(last30, last60, last90):
         "feed": feed_price
     }
 
-def make_range(value):
-    low = round(value * 0.8, 1)
-    high = round(value * 1.2, 1)
-    return f"${low} - ${high}"
+@bot.event
+async def on_ready():
+    print(f"✅ Logged in as {bot.user}")
+    try:
+        await bot.tree.sync()
+        print("🔁 Slash commands synced")
+    except Exception as e:
+        print("Sync error:", e)
 
-def format_prices_block(stats):
-    return (
-        f"Lowest: ${round(stats['avg_low'],1)}\n"
-        f"Average: ${round(stats['overall_avg'],1)}\n"
-        f"Highest: ${round(stats['avg_high'],1)}"
-    )
+    for guild in bot.guilds:
+        if guild.text_channels:
+            first_channel = guild.text_channels[0]
+            try:
+                await first_channel.send("Ready!")
+                print(f"✅ Sent ready message to {guild.name} in #{first_channel.name}")
+            except Exception as e:
+                print(f"⚠️ Couldn't send message in {guild.name}: {e}")
 
-def format_signals_block(stats):
-    return (
-        f"Buy: {make_range(stats['buy'])}\n"
-        f"Sell: {make_range(stats['sell'])}\n"
-        f"Stop: {make_range(stats['stop'])}\n"
-        f"Feed: {make_range(stats['feed'])}"
-    )
+@bot.tree.command(name="coin", description="Get weighted stats from 30/60/90 days (55/30/15%)")
+async def coin_slash(interaction: discord.Interaction, coin: str):
+    await run_coin_command(interaction=interaction, coin=coin)
 
-async def build_embed_for_coin(coin):
+async def run_coin_command(interaction=None, ctx=None, coin=None):
+    """Shared logic for slash commands (interaction) and prefix messages (ctx)"""
+    # Fetch data
     values = get_binance_prices(coin)
     latest_price = get_latest_price(coin)
-    if not values or len(values) < 90 or latest_price is None:
-        return None, "Error fetching data. Make sure the coin exists on Binance and has enough history."
+
+    if not values or len(values) < 90 or not latest_price:
+        msg = "Error fetching data. Make sure the coin exists on Binance and has enough history."
+        if interaction:
+            await interaction.response.send_message(msg)
+        elif ctx:
+            await ctx.send(msg)
+        return
 
     last30 = values[-30:]
     last60 = values[-60:]
     last90 = values[-90:]
 
     stats = weighted_stats(last30, last60, last90)
-    # round numeric stats to 1 decimal for display
     for k in stats:
         stats[k] = round(stats[k], 1)
     latest_price = round(latest_price, 1)
 
-    # determine main signal (20% closeness)
+    def make_range(value):
+        low = round(value * 0.8, 1)
+        high = round(value * 1.2, 1)
+        return f"${low} - ${high}"
+
+    buy_range = make_range(stats["buy"])
+    sell_range = make_range(stats["sell"])
+    stop_range = make_range(stats["stop"])
+    feed_range = make_range(stats["feed"])
+
     if stats["buy"] * 0.8 <= latest_price <= stats["buy"] * 1.2:
         signal = "BUY"
         color = discord.Color.green()
@@ -110,48 +130,43 @@ async def build_embed_for_coin(coin):
         title=f"{coin.upper()} - {signal} (${latest_price})",
         color=color
     )
-    embed.add_field(name="Prices", value=format_prices_block(stats), inline=False)
-    embed.add_field(name="Signals", value=format_signals_block(stats), inline=False)
-    embed.set_footer(text="Weights: 55% last30 | 30% last60 | 15% last90 — Data from Binance")
-    return embed, None
 
-# Slash command
-@bot.tree.command(name="coin", description="Get weighted stats from 30/60/90 days (55/30/15%)")
-async def coin_slash(interaction: discord.Interaction, coin: str):
-    await interaction.response.defer(thinking=True)
-    embed, err = await build_embed_for_coin(coin)
-    if err:
-        await interaction.followup.send(err)
-        return
-    await interaction.followup.send(embed=embed)
+    embed.add_field(
+        name="Prices",
+        value=(
+            f"Lowest: **${stats['avg_low']}** • "
+            f"Average: **${stats['overall_avg']}** • "
+            f"Highest: **${stats['avg_high']}**"
+        ),
+        inline=False
+    )
 
-# Prefix command
-@bot.command(name="coin")
-async def coin_prefix(ctx: commands.Context, coin: str):
-    # reply quickly then edit with embed (gives user immediate feedback)
-    msg = await ctx.reply("Processing...")
-    embed, err = await build_embed_for_coin(coin)
-    if err:
-        await msg.edit(content=err)
-        return
-    await msg.edit(content=None, embed=embed)
+    embed.add_field(
+        name="Signals",
+        value=(
+            f"Buy: **{buy_range}** • "
+            f"Sell: **{sell_range}** • "
+            f"Stop: **{stop_range}** • "
+            f"Feed: **{feed_range}**"
+        ),
+        inline=False
+    )
+
+    embed.set_footer(text="Data from Binance")
+
+    if interaction:
+        await interaction.response.send_message(embed=embed)
+    elif ctx:
+        await ctx.send(embed=embed)
 
 @bot.event
-async def on_ready():
-    print(f"Logged in as {bot.user}")
-    try:
-        await bot.tree.sync()
-        print("Slash commands synced")
-    except Exception as e:
-        print("Sync error:", e)
+async def on_message(message):
+    if message.author.bot:
+        return
 
-    # send simple ready message to first allowed channel in each guild
-    for guild in bot.guilds:
-        first_channel = next((c for c in guild.text_channels if c.permissions_for(guild.me).send_messages), None)
-        if first_channel:
-            try:
-                await first_channel.send(f"Hi! Use /coin or !coin to get market stats.")
-            except Exception:
-                pass
+    match = re.match(r"!coin\s+(\S+)", message.content)
+    if match:
+        coin_name = match.group(1)
+        await run_coin_command(ctx=message.channel, coin=coin_name)
 
 bot.run(TOKEN)
