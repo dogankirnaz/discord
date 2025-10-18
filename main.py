@@ -116,7 +116,7 @@ async def getcoin(interaction: discord.Interaction, coin: str):
 
     embed.add_field(
         name="Signals",
-        value=f"Buy: ${stats['buy']} | Sell: ${stats['sell']} | Stop: ${stats['stop']} | Feed: ${stats['feed']}",
+        value=f"Buy: **${stats['buy']}** • Sell: **${stats['sell']}** • Stop: **${stats['stop']}** • Feed: **${stats['feed']}**",
         inline=False
     )
 
