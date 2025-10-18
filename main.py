@@ -89,6 +89,7 @@ async def run_coin_command(interaction=None, message=None, coin=None, ephemeral=
     # Fetch data
     values = get_binance_prices(coin)
     latest_price = get_latest_price(coin)
+    latest_price_str = f"${latest_price:,.2f}"
 
     if not values or len(values) < 90 or not latest_price:
         msg = "Error fetching data. Make sure the coin exists on Binance and has enough history."
@@ -107,11 +108,10 @@ async def run_coin_command(interaction=None, message=None, coin=None, ephemeral=
     stats = weighted_stats(last30, last60, last90)
     for k in stats:
         stats[k] = round(stats[k], 1)
-    latest_price = round(latest_price, 1)
 
     def make_range(value, delta=0.1):
-        return f"${round(value - delta, 1)} - ${round(value + delta, 1)}"
-
+        return f"${round(value - delta,1)} - ${round(value + delta,1)}"
+    
     buy_range = make_range(stats["buy"])
     sell_range = make_range(stats["sell"])
     stop_range = make_range(stats["stop"])
@@ -127,7 +127,7 @@ async def run_coin_command(interaction=None, message=None, coin=None, ephemeral=
         color = discord.Color.greyple()
 
     embed = discord.Embed(
-        title=f"{coin.upper()} — {signal} (${latest_price})",
+        title=f"{coin.upper()} — {signal} (${latest_price_str})",
         color=color
     )
 
