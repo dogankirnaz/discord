@@ -135,7 +135,7 @@ async def run_coin_command(interaction=None, message=None, coin=None, ephemeral=
     stop_range = make_signal_range(stats["stop"])
 
     buy_low, buy_high = stats["buy"] * 0.9, stats["buy"] * 1.1
-sell_low, sell_high = stats["sell"] * 0.9, stats["sell"] * 1.1
+    sell_low, sell_high = stats["sell"] * 0.9, stats["sell"] * 1.1
 
     if latest <= stats["stop"] * 0.9:
         signal, color = "WAIT", discord.Color.orange()
