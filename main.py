@@ -76,6 +76,10 @@ async def getcoin(interaction: discord.Interaction, coin: str):
 
     stats = weighted_stats(last30, last60, last90)
 
+    # Round all values to 1 decimal
+    for k in stats:
+        stats[k] = round(stats[k], 1)
+
     embed = discord.Embed(
         title=f"{coin.upper()} - Weighted 90d Summary",
         color=discord.Color.green()
@@ -83,13 +87,13 @@ async def getcoin(interaction: discord.Interaction, coin: str):
 
     embed.add_field(
         name="📊 Prices (weighted)",
-        value=f"Lowest: ${stats['avg_low']:.2f} | Average: ${stats['overall_avg']:.2f} | Highest: ${stats['avg_high']:.2f}",
+        value=f"Lowest: ${stats['avg_low']} | Average: ${stats['overall_avg']} | Highest: ${stats['avg_high']}",
         inline=False
     )
 
     embed.add_field(
         name="💰 Signals",
-        value=f"Buy: ${stats['buy']:.2f} | Sell: ${stats['sell']:.2f} | Stop: ${stats['stop']:.2f} | Feed: ${stats['feed']:.2f}",
+        value=f"Buy: ${stats['buy']} | Sell: ${stats['sell']} | Stop: ${stats['stop']} | Feed: ${stats['feed']}",
         inline=False
     )
 
