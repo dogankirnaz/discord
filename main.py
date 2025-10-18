@@ -134,15 +134,21 @@ async def run_coin_command(interaction=None, message=None, coin=None, ephemeral=
     sell_range = make_signal_range(stats["sell"])
     stop_range = make_signal_range(stats["stop"])
 
+    buy_low, buy_high = stats["buy"] * 0.9, stats["buy"] * 1.1
+    sell_low, sell_high = stats["sell"] * 0.9, stats["sell"] * 1.1
+
     if latest <= stats["stop"] * 0.9:
         signal, color = "WAIT", discord.Color.orange()
-    elif stats["buy"] * 0.9 <= latest <= stats["buy"] * 1.1:
+    elif buy_low <= latest <= buy_high and sell_low <= latest <= sell_high:
+    # close to both buy and sell → HOLD
+        signal, color = "HOLD", discord.Color.greyple()
+    elif buy_low <= latest <= buy_high:
         signal, color = "BUY", discord.Color.green()
-    elif stats["sell"] * 0.9 <= latest <= stats["sell"] * 1.1:
+    elif sell_low <= latest <= sell_high:
         signal, color = "SELL", discord.Color.red()
     else:
         signal, color = "HOLD", discord.Color.greyple()
-
+        
     embed = discord.Embed(title=f"{coin.upper()} — {signal} ({usd(latest)})", color=color)
     embed.add_field(
         name="Prices",
