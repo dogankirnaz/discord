@@ -69,12 +69,6 @@ def weighted_stats(last30, last60, last90):
 def usd(value):
     return f"${value:,.2f}"
 
-def make_signal_range(value, percent=0.01, min_delta=0.01):
-    delta = max(value * percent, min_delta)
-    low = value - delta
-    high = value + delta
-    return f"{usd(low)} - {usd(high)}"
-
 # --- Bot events ---
 @bot.event
 async def on_ready():
@@ -125,10 +119,6 @@ async def run_coin_command(interaction=None, message=None, coin=None, ephemeral=
     for k in stats:
         stats[k] = round(stats[k], 2)
 
-    buy_range = make_signal_range(stats["buy"])
-    sell_range = make_signal_range(stats["sell"])
-    stop_range = make_signal_range(stats["stop"])
-
     buy_low, buy_high = stats["buy"] * 0.9, stats["buy"] * 1.1
     sell_low, sell_high = stats["sell"] * 0.9, stats["sell"] * 1.1
 
@@ -156,7 +146,7 @@ async def run_coin_command(interaction=None, message=None, coin=None, ephemeral=
     )
     embed.add_field(
         name="Signals",
-        value=f"Buy: **{buy_range}**\nSell: **{sell_range}**\nStop: **{stop_range}**",
+        value=f"Buy: **{usd(stats['buy'])}**\nSell: **{usd(stats['sell'])}**\nStop: **{usd(stats['stop'])}**",
         inline=False
     )
 
