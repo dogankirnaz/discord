@@ -63,21 +63,15 @@ def weighted_stats(last30, last60, last90):
         "stop": stop_loss
     }
 
-# --- Utility: format USD with commas and 2 decimals ---
+# --- Utility functions ---
 def usd(value):
     return f"${value:,.2f}"
 
-def make_range(value):
-    # Small delta for coins <10, larger for bigger coins
-    if value < 10:
-        delta = 0.1
-    elif value < 100:
-        delta = 1
-    elif value < 1000:
-        delta = 5
-    else:
-        delta = value * 0.01  # 1% for very big prices
-    return f"{usd(value - delta)} - {usd(value + delta)}"
+# Robust signals range ±10% clamped by min/max
+def make_signal_range(value, min_value, max_value, percent=0.1):
+    low = max(value * (1 - percent), min_value)
+    high = min(value * (1 + percent), max_value)
+    return f"{usd(low)} - {usd(high)}"
 
 # --- Bot events ---
 @bot.event
@@ -115,7 +109,8 @@ async def run_coin_command(interaction=None, message=None, coin=None, ephemeral=
         if interaction:
             await interaction.response.send_message(msg, ephemeral=ephemeral)
         elif message:
-            await message.reply(msg, mention_author=True)
+            reply = await message.reply(msg, mention_author=True)
+            await asyncio.sleep(30)
             try: await message.delete()
             except: pass
         return
@@ -123,13 +118,15 @@ async def run_coin_command(interaction=None, message=None, coin=None, ephemeral=
     last30, last60, last90 = values[-30:], values[-60:], values[-90:]
     stats = weighted_stats(last30, last60, last90)
 
-    # Format all prices
+    # Format stats prices
     for k in stats:
         stats[k] = round(stats[k], 2)
     latest_price_str = usd(latest_price)
-    buy_range = make_range(stats["buy"])
-    sell_range = make_range(stats["sell"])
-    stop_range = make_range(stats["stop"])
+
+    # Make signal ranges ±10% clamped to meaningful bounds
+    buy_range = make_signal_range(stats["buy"], stats["lowest"], stats["avg_high"])
+    sell_range = make_signal_range(stats["sell"], stats["avg_low"], stats["highest"])
+    stop_range = make_signal_range(stats["stop"], stats["lowest"], stats["avg_low"])
 
     # Determine signal
     if stats["buy"] * 0.8 <= latest_price <= stats["buy"] * 1.2:
@@ -156,13 +153,11 @@ async def run_coin_command(interaction=None, message=None, coin=None, ephemeral=
         await interaction.response.send_message(embed=embed, ephemeral=ephemeral)
     elif message:
         await message.reply(embed=embed, mention_author=True)
-        try:
-            await asyncio.sleep(30)
-            await message.delete()  # Delete user command after responding
-        except:
-            pass
+        await asyncio.sleep(30)
+        try: await message.delete()
+        except: pass
 
-# --- Message command listener for ! commands
+# --- Message command listener for !coin or !<coin> ---
 @bot.event
 async def on_message(message):
     if message.author.bot:
