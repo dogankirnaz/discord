@@ -5,7 +5,6 @@ import requests
 import os
 import re
 import asyncio
-import math
 
 TOKEN = os.getenv("DISCORD_TOKEN")
 
@@ -75,17 +74,10 @@ def weighted_stats(last30, last60, last90):
 def usd(value):
     return f"${value:,.2f}"
 
-def make_signal_range(value):
-    if value == 0:
-        return "0 - 0"
-
-    magnitude = 10 ** math.floor(math.log10(abs(value)))
-
-    delta = magnitude * 0.01
-
+def make_signal_range(value, percent=0.01, min_delta=0.01):
+    delta = max(value * percent, min_delta)
     low = value - delta
     high = value + delta
-
     return f"{usd(low)} - {usd(high)}"
 
 # --- Bot events ---
