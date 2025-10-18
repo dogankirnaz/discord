@@ -45,16 +45,17 @@ def weighted_stats(last30, last60, last90):
     all_values = last30 + last60 + last90
 
     # Weighted average of all values
-    average = (sum(last30)*w30 + sum(last60)*w60 + sum(last90)*w90) / (len(last30)*w30 + len(last60)*w60 + len(last90)*w90)
+    main_average = (sum(last30)*w30 + sum(last60)*w60 + sum(last90)*w90) / (len(last30)*w30 + len(last60)*w60 + len(last90)*w90)
 
     # Collect values lower and higher than average
-    lows = [v for v in all_values if v < average]
-    highs = [v for v in all_values if v > average]
+    lows = [v for v in all_values if v < main_average]
+    highs = [v for v in all_values if v > main_average]
 
     # Midpoint (average) of lows and highs
-    lowest = sum(lows)/len(lows) if lows else average
-    highest = sum(highs)/len(highs) if highs else average
-
+    lowest = sum(lows)/len(lows) if lows else main_average
+    highest = sum(highs)/len(highs) if highs else main_average
+    average = max((lowest + highest) / 2, 0)
+    
     # Calculate buy/sell/stop
     buy = lowest * 1.05
     sell = highest * 0.95
