@@ -88,7 +88,6 @@ async def getcoin(interaction: discord.Interaction, coin: str):
     # Round values to one decimal
     for k in stats:
         stats[k] = round(stats[k], 1)
-    latest_price = round(latest_price, 1)
 
     # Determine signal based on 20% closeness
     buy_threshold = stats["buy"] * 1.2
@@ -105,12 +104,12 @@ async def getcoin(interaction: discord.Interaction, coin: str):
         color = discord.Color.greyple()
 
     embed = discord.Embed(
-        title=f"{coin.upper()} - {signal}",
+        title=f"{coin.upper()} - {signal} ({latest_price})",
         color=color
     )
 
     embed.add_field(
-        name="Prices (weighted)",
+        name="Prices",
         value=f"Lowest: ${stats['avg_low']} | Average: ${stats['overall_avg']} | Highest: ${stats['avg_high']}",
         inline=False
     )
@@ -122,7 +121,7 @@ async def getcoin(interaction: discord.Interaction, coin: str):
     )
 
     embed.add_field(
-        name="Current Price",
+        name="Current",
         value=f"${latest_price}",
         inline=False
     )
