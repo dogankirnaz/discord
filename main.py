@@ -41,12 +41,14 @@ def get_latest_price(coin):
 def weighted_stats(last30, last60, last90):
     w30, w60, w90 = 0.55, 0.30, 0.15
 
-    def weighted_avg(func):
-        return func(last30) * w30 + func(last60) * w60 + func(last90) * w90
+    # Helper to calculate average of a list
+    def avg(lst):
+        return sum(lst) / len(lst)
 
-    lowest = weighted_avg(min)
-    highest = weighted_avg(max)
-    average = weighted_avg(lambda p: sum(p)/len(p))
+    # Calculate average lowest, average highest, and overall average
+    lowest = w30 * avg(last30) + w60 * avg(last60) + w90 * avg(last90)
+    highest = w30 * avg(last30) + w60 * avg(last60) + w90 * avg(last90)  # same here
+    average = (avg(last30) + avg(last60) + avg(last90)) / 3
 
     buy = lowest * 1.05
     sell = highest * 0.95
