@@ -68,9 +68,39 @@ async def on_ready():
     except Exception as e:
         print("Sync error:", e)
 
-@bot.tree.command(name="getcoin", description="Get weighted stats from 30/60/90 days (55/30/15%)")
-async def getcoin(interaction: discord.Interaction, coin: str):
-    await interaction.response.defer(thinking=True)
+    # Send a message to the first text channel
+    for guild in bot.guilds:
+        if guild.text_channels:
+            first_channel = guild.text_channels[0]
+            try:
+                await first_channel.send(
+                    f"Hi!"
+                )
+                print(f"✅ Sent ready message to {guild.name} in #{first_channel.name}")
+            except Exception as e:
+                print(f"⚠️ Couldn't send message in {guild.name}: {e}")
+
+@bot.tree.command(name="coin", description="Get weighted stats from 30/60/90 days (55/30/15%)")
+async def coin_slash(interaction: discord.Interaction, coin: str):
+    await run_coin_command(interaction=interaction, coin=coin)
+
+@bot.command(name="coin")
+async def coin_prefix(ctx, coin: str):
+    class DummyInteraction:
+        # This mimics an interaction for shared logic
+        async def response_defer(self, **_): pass
+        async def followup_send(self, content=None, embed=None):
+            await ctx.send(content=content, embed=embed)
+
+    dummy = DummyInteraction()
+    dummy.response = type('', (), {'defer': lambda *a, **k: None})()
+    dummy.followup = type('', (), {'send': lambda _, **k: ctx.send(**k)})()
+    await run_coin_command(interaction=dummy, coin=coin)
+
+async def run_coin_command(interaction, coin):
+    """Shared logic for both slash and prefix commands"""
+    if hasattr(interaction, "response"):
+        await interaction.response.defer(thinking=True)
 
     values = get_binance_prices(coin)
     latest_price = get_latest_price(coin)
@@ -84,19 +114,24 @@ async def getcoin(interaction: discord.Interaction, coin: str):
     last90 = values[-90:]
 
     stats = weighted_stats(last30, last60, last90)
-
-    # Round values to one decimal
     for k in stats:
         stats[k] = round(stats[k], 1)
+    latest_price = round(latest_price, 1)
 
-    # Determine signal based on 20% closeness
-    buy_threshold = stats["buy"] * 1.2
-    sell_threshold = stats["sell"] * 0.8
+    def make_range(value):
+        low = round(value * 0.8, 1)
+        high = round(value * 1.2, 1)
+        return f"${low} - ${high}"
 
-    if latest_price <= buy_threshold:
+    buy_range = make_range(stats["buy"])
+    sell_range = make_range(stats["sell"])
+    stop_range = make_range(stats["stop"])
+    feed_range = make_range(stats["feed"])
+
+    if stats["buy"] * 0.8 <= latest_price <= stats["buy"] * 1.2:
         signal = "BUY"
         color = discord.Color.green()
-    elif latest_price >= sell_threshold:
+    elif stats["sell"] * 0.8 <= latest_price <= stats["sell"] * 1.2:
         signal = "SELL"
         color = discord.Color.red()
     else:
@@ -104,30 +139,33 @@ async def getcoin(interaction: discord.Interaction, coin: str):
         color = discord.Color.greyple()
 
     embed = discord.Embed(
-        title=f"{coin.upper()} - {signal} ({latest_price})",
+        title=f"{coin.upper()} - {signal} (${latest_price})",
         color=color
     )
 
     embed.add_field(
         name="Prices",
-        value=f"Lowest: ${stats['avg_low']} | Average: ${stats['overall_avg']} | Highest: ${stats['avg_high']}",
+        value=(
+            f"Lowest: **${stats['avg_low']}**\n"
+            f"Average: **${stats['overall_avg']}**\n"
+            f"Highest: **${stats['avg_high']}**"
+        ),
         inline=False
     )
 
     embed.add_field(
         name="Signals",
-        value=f"Buy: **${stats['buy']}** • Sell: **${stats['sell']}** • Stop: **${stats['stop']}** • Feed: **${stats['feed']}**",
-        inline=False
-    )
-
-    embed.add_field(
-        name="Current",
-        value=f"${latest_price}",
+        value=(
+            f"Buy: **{buy_range}**\n"
+            f"Sell: **{sell_range}**\n"
+            f"Stop: **{stop_range}**\n"
+            f"Feed: **{feed_range}**"
+        ),
         inline=False
     )
 
     embed.set_footer(text="Weights: 55% last30 | 30% last60 | 15% last90 — Data from Binance")
 
     await interaction.followup.send(embed=embed)
-
+    
 bot.run(TOKEN)
