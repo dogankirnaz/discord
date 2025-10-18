@@ -49,7 +49,7 @@ def weighted_stats(last30, last60, last90):
     overall_avg = weighted_avg(lambda p: sum(p)/len(p))
 
     buy_price = avg_low * 1.05
-    sell_price = avg_high * 1.05  # slightly above high average
+    sell_price = avg_high * 1.05
     stop_loss = lowest
 
     return {
@@ -67,7 +67,8 @@ def weighted_stats(last30, last60, last90):
 def usd(value):
     return f"${value:,.2f}"
 
-def make_range(value, delta=0.1):
+def make_range(value, percent=0.02):  # dynamic 2% of value
+    delta = value * percent
     return f"{usd(value - delta)} - {usd(value + delta)}"
 
 # --- Bot events ---
@@ -96,7 +97,7 @@ async def on_ready():
 async def coin_slash(interaction: discord.Interaction, coin: str):
     await run_coin_command(interaction=interaction, coin=coin, ephemeral=True)
 
-# --- Shared logic for both slash and message commands ---
+# --- Shared logic ---
 async def run_coin_command(interaction=None, message=None, coin=None, ephemeral=False):
     values = get_binance_prices(coin)
     latest_price = get_latest_price(coin)
@@ -106,9 +107,7 @@ async def run_coin_command(interaction=None, message=None, coin=None, ephemeral=
         if interaction:
             await interaction.response.send_message(msg, ephemeral=ephemeral)
         elif message:
-            reply_msg = await message.reply(msg, mention_author=True)
-            await asyncio.sleep(30)
-            await reply_msg.delete()
+            await message.reply(msg, mention_author=True)
         return
 
     last30, last60, last90 = values[-30:], values[-60:], values[-90:]
@@ -118,7 +117,9 @@ async def run_coin_command(interaction=None, message=None, coin=None, ephemeral=
     for k in stats:
         stats[k] = round(stats[k], 2)
     latest_price_str = usd(latest_price)
-    buy_range, sell_range, stop_range = make_range(stats["buy"]), make_range(stats["sell"]), make_range(stats["stop"])
+    buy_range = make_range(stats["buy"])
+    sell_range = make_range(stats["sell"])
+    stop_range = make_range(stats["stop"])
 
     # Determine signal
     if stats["buy"] * 0.8 <= latest_price <= stats["buy"] * 1.2:
@@ -141,13 +142,10 @@ async def run_coin_command(interaction=None, message=None, coin=None, ephemeral=
         inline=False
     )
 
-    # Send result
     if interaction:
         await interaction.response.send_message(embed=embed, ephemeral=ephemeral)
     elif message:
-        reply_msg = await message.reply(embed=embed, mention_author=True)
-        await asyncio.sleep(30)
-        await reply_msg.delete()
+        await message.reply(embed=embed, mention_author=True)
 
 # --- Message command listener ---
 @bot.event
@@ -157,6 +155,11 @@ async def on_message(message):
     match = re.match(r"!coin\s+(\S+)", message.content)
     if match:
         coin_name = match.group(1)
+        # Delete the user's command message for cleanliness
+        try:
+            await message.delete()
+        except:
+            pass
         await run_coin_command(message=message, coin=coin_name)
 
 bot.run(TOKEN)
