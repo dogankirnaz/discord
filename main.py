@@ -104,10 +104,8 @@ async def run_coin_command(interaction=None, message=None, coin=None):
         stats[k] = round(stats[k], 1)
     latest_price = round(latest_price, 1)
 
-    def make_range(value, percent=0.05):
-        low = round(value * (1 - percent), 1)
-        high = round(value * (1 + percent), 1)
-        return f"${low} - ${high}"
+    def make_range(value, delta=0.1):
+        return f"${round(value - delta, 1)} - ${round(value + delta, 1)}"
 
     buy_range = make_range(stats["buy"])
     sell_range = make_range(stats["sell"])
